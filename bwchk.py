@@ -19,7 +19,7 @@
 
 import multiprocessing
 import subprocess
-import optparse
+import argparse
 import sys
 
 
@@ -57,12 +57,13 @@ def configure_parser():
 
     """ Look to change this to use argparse rather than optparse"""
 
-    arg_parser = optparse.OptionParser()
-    arg_parser.add_option('-v', '--verbose', dest='verbose',
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument('-v', '--verbose', dest='verbose',
                         help='show output from individual commands',
                         action='store_true')
-    arg_parser.add_option('-i', '--cvmips',
-                        help='comma separated list of CVM host/IP addresses')
+    arg_parser.add_argument('-i', '--cvmips',
+                        help='comma separated list of CVM host/IP addresses',
+                        required=True)
     return arg_parser
 
 
@@ -100,20 +101,17 @@ def main():
                     print ("client_cmd: %s" % client_cmd)
                 client_proc = multiprocessing.Process(target=run_iperf,
                                                       args=(client_cmd, cvm_ip, opts.verbose))
-                client_jobs.append(client_proc)
                 client_proc.start()
+                client_proc.join() # Wait for this client to finish before starting the next
+                if opts.verbose:
+                    print ('%s.exitcode = %s' % (client_proc.name, client_proc.exitcode))
             except OSError as e:
                 e.action = "spawning client process"
                 text = "Error'd at %s: %s" % (e.action, e)
                 sys.exit(text)
 
-            for client_proc in client_jobs:
-                client_proc.join()
-                if opts.verbose:
-                    print ('%s.exitcode = %s' % (client_proc.name, client_proc.exitcode))
-
-    server_proc.terminate()
-    server_proc.join()
+        server_proc.terminate()
+        server_proc.join()
 
 if __name__ == "__main__":
     try:
